@@ -62,19 +62,6 @@ function GetModelView(translationX, translationY, translationZ, rotationX, rotat
 		0, 0, translationZ, 1
     ];
 
-    var trans = MatrixMult(transZ, transXY);
-    var transXYneg = [
-        1, 0, 0, 0,
-        0, 1, 0, 0,
-        0, 0, 1, 0,
-        -1*translationX, -1*translationY, 0, 1
-    ];
-    var transZneg = [
-        1, 0, 0, 0,
-		0, 1, 0, 0,
-		0, 0, 1, 0,
-		0, 0, -1*translationZ, 1
-    ];
     
 	var rotX = [
         1, 0, 0, 0,
@@ -117,7 +104,7 @@ function createSphere(radius, latitudeBands, longitudeBands) {
             const y = cosTheta;
             const z = sinPhi * sinTheta;
             const u = 1 - (longNumber / longitudeBands);
-            const v = 1 - (latNumber / latitudeBands);
+            const v = (latNumber / latitudeBands);
 
             normalData.push(x);
             normalData.push(y);
@@ -157,6 +144,19 @@ function createSphere(radius, latitudeBands, longitudeBands) {
     };
 }
 
+// Initialize orbit data
+function createOrbitVertices(radius, segments, thickness = 0.02, layers = 5) {
+    const vertices = [];
+    for (let j = 0; j < layers; j++) {
+        const currentRadius = radius + (j * thickness / layers);
+        for (let i = 0; i <= segments; i++) {
+            const angle = (i / segments) * 2 * Math.PI;
+            vertices.push(currentRadius * Math.cos(angle), currentRadius * Math.sin(angle), 0);
+        }
+    }
+    return vertices;
+}
+
 function createBuffer(data, type, usage) {
     const buffer = gl.createBuffer();
     gl.bindBuffer(type, buffer);
@@ -180,7 +180,7 @@ const planetsData = [
     { name: "Uranus", radius: 0.5, distance: 20.14, textureUrl: 'textures/uranus.jpg'},
     { name: "Neptune", radius: 0.5, distance: 31.20, textureUrl: 'textures/neptune.jpg'}
 ];
-
+// Planet drawer class
 class PlanetDrawer {
     constructor(gl, radius, distance, textureUrl) {
         this.gl = gl;
@@ -211,18 +211,11 @@ class PlanetDrawer {
 
     setupBuffers() {
         const sphere = createSphere(this.radius, 30, 30);
-        this.positionBuffer = this.createBuffer(sphere.vertexPositions, gl.ARRAY_BUFFER, gl.STATIC_DRAW);
-        this.normalBuffer = this.createBuffer(sphere.normals, gl.ARRAY_BUFFER, gl.STATIC_DRAW);
-        this.textureCoordBuffer = this.createBuffer(sphere.textureCoords, gl.ARRAY_BUFFER, gl.STATIC_DRAW);
-        this.indexBuffer = this.createBuffer(sphere.indices, gl.ELEMENT_ARRAY_BUFFER, gl.STATIC_DRAW);
+        this.positionBuffer = createBuffer(sphere.vertexPositions, gl.ARRAY_BUFFER, gl.STATIC_DRAW);
+        this.normalBuffer = createBuffer(sphere.normals, gl.ARRAY_BUFFER, gl.STATIC_DRAW);
+        this.textureCoordBuffer = createBuffer(sphere.textureCoords, gl.ARRAY_BUFFER, gl.STATIC_DRAW);
+        this.indexBuffer = createBuffer(sphere.indices, gl.ELEMENT_ARRAY_BUFFER, gl.STATIC_DRAW);
         this.vertexCount = sphere.indices.length;
-    }
-
-    createBuffer(data, type, usage) {
-        const buffer = this.gl.createBuffer();
-        this.gl.bindBuffer(type, buffer);
-        this.gl.bufferData(type, data, usage);
-        return buffer;
     }
 
     loadTexture() {
@@ -240,7 +233,7 @@ class PlanetDrawer {
         gl.useProgram(this.shaderProgram);
         var modelViewMatrix = GetModelView(-this.distance, 0, transZ, rotX, rotY);
 
-        console.log("draw");
+        //console.log("draw");
 
         this.gl.uniformMatrix4fv(this.uProjectionMatrix, false, projectionMatrix);
         this.gl.uniformMatrix4fv(this.uModelViewMatrix, false, modelViewMatrix);
@@ -263,7 +256,75 @@ class PlanetDrawer {
     }
 }
 
+const orbitVertexShaderSource = `
+attribute vec4 aPosition;
+uniform mat4 uModelViewMatrix;
+uniform mat4 uProjectionMatrix;
+void main(void) {
+
+    gl_Position = uProjectionMatrix * uModelViewMatrix * aPosition;
+}
+`;
+const orbitFragmentShaderSource = `
+void main(void) {
+    gl_FragColor = vec4(0.5, 0.5, 0.5, 1.0);
+}
+`;
+
+const orbitsData = planetsData.map(planetData => {
+    const radius = planetData.distance;
+    const orbitVertices = createOrbitVertices(planetData.distance, 100);
+    return {radius: radius, vertices: orbitVertices, vertexCount: orbitVertices.length / 3};
+});
+
+// Orbit drawer class
+class OrbitDrawer{
+    constructor(gl, distance, vertices, vertexCount) {
+        this.gl = gl;
+        this.distance = distance;
+        this.vertices = vertices;
+        this.vertexCount = vertexCount;
+
+        this.setupBuffers();
+
+        this.vertexShader = compileShader(orbitVertexShaderSource, gl.VERTEX_SHADER);
+        this.fragmentShader = compileShader(orbitFragmentShaderSource, gl.FRAGMENT_SHADER);
+        this.shaderProgram = gl.createProgram();
+        gl.attachShader(this.shaderProgram, this.vertexShader);
+        gl.attachShader(this.shaderProgram, this.fragmentShader);
+        gl.linkProgram(this.shaderProgram);
+        if (!gl.getProgramParameter(this.shaderProgram, gl.LINK_STATUS)) {
+            console.error('Unable to initialize the shader program: ' + gl.getProgramInfoLog(this.shaderProgram));
+        }
+        gl.useProgram(this.shaderProgram);
+
+        this.aPosition = gl.getAttribLocation(this.shaderProgram, 'aPosition');
+        this.uModelViewMatrix = gl.getUniformLocation(this.shaderProgram, 'uModelViewMatrix');
+        this.uProjectionMatrix = gl.getUniformLocation(this.shaderProgram, 'uProjectionMatrix');
+    }
+
+    setupBuffers() {
+        this.orbitBuffer = createBuffer(new Float32Array(this.vertices), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
+    }
+
+
+    draw(projectionMatrix) {
+        gl.useProgram(this.shaderProgram);
+        var modelViewMatrix = GetModelView(0, 0, transZ, rotX + degToRad(90), rotY);
+
+        this.gl.uniformMatrix4fv(this.uProjectionMatrix, false, projectionMatrix);
+        this.gl.uniformMatrix4fv(this.uModelViewMatrix, false, modelViewMatrix);
+
+        this.gl.bindBuffer(gl.ARRAY_BUFFER, this.orbitBuffer);
+        this.gl.vertexAttribPointer(this.aPosition, 3, gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(this.aPosition);
+
+        this.gl.drawArrays(gl.LINE_LOOP, 0, this.vertexCount);
+    }
+}
+
 var planetDrawers;
+var orbitDrawers;
 var canvas, gl;
 var perspectiveMatrix;	// perspective projection matrix
 var rotX=0, rotY=0, transZ=3, autorot=0;
@@ -286,7 +347,11 @@ function InitWebGL()
 	planetDrawers = planetsData.map(planetData =>
         new PlanetDrawer(gl, planetData.radius, planetData.distance, planetData.textureUrl)
     );
-	
+	// Initialize the program and buffers for drawing orbits
+    orbitDrawers = orbitsData.map(orbitData =>
+        new OrbitDrawer(gl, orbitData.radius, orbitData.vertices, orbitData.vertexCount)
+    );
+
 	// Set the viewport size
 	UpdateCanvasSize();
 }
@@ -313,10 +378,10 @@ perspectiveMatrix = mat4.create();
 function UpdateProjectionMatrix()
 {
 	var r = canvas.width / canvas.height;
-	var n = (transZ - 1.74);
+	var n = (transZ - 100); //near clipping plane
 	const min_n = 0.001;
 	if ( n < min_n ) n = min_n;
-	var f = (transZ + 1.74);;
+	var f = (transZ + 100); //far clipping plane
 	var fov = 3.145 * 60 / 180;
 	var s = 1 / Math.tan( fov/2 );
 	perspectiveMatrix = [
@@ -330,9 +395,13 @@ function UpdateProjectionMatrix()
 function drawScene() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.viewport(0, 0, canvas.width, canvas.height);
-    console.log("drawscene");
+    //console.log("drawscene");
     planetDrawers.forEach(planetDrawer => {
         planetDrawer.draw(perspectiveMatrix);
+    });
+
+    orbitDrawers.forEach(orbitDrawer => {
+        orbitDrawer.draw(perspectiveMatrix);
     });
 
 }
