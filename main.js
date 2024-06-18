@@ -31,6 +31,10 @@ function compileShader(source, type) {
     return shader;
 }
 
+function isPowerOfTwo(value) {
+    return (value & (value - 1)) == 0;
+}
+
 function MatrixMult( A, B )
 {
 	var C = [];
@@ -157,6 +161,26 @@ function createOrbitVertices(radius, segments, thickness = 0.02, layers = 5) {
     return vertices;
 }
 
+// Initialize rings data
+function createRingsVertices(innerRadius, outerRadius, segments) {
+    const vertices = [];
+    const textureCoords = [];
+    for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * 2 * Math.PI;
+        const cosAngle = Math.cos(angle);
+        const sinAngle = Math.sin(angle);
+        
+        // Vertices for inner and outer rings
+        vertices.push(innerRadius * cosAngle, innerRadius * sinAngle, 0);
+        vertices.push(outerRadius * cosAngle, outerRadius * sinAngle, 0);
+        
+        // Texture coordinates
+        textureCoords.push(i / segments, 0); 
+        textureCoords.push(i / segments, 1); 
+    }
+    return { vertices, textureCoords };
+}
+
 function createBuffer(data, type, usage) {
     const buffer = gl.createBuffer();
     gl.bindBuffer(type, buffer);
@@ -256,6 +280,97 @@ class PlanetDrawer {
     }
 }
 
+class SaturnRingsDrawer {
+    constructor(gl, distance, textureUrl) {
+        this.gl = gl;;
+        this.distance = distance;
+        this.textureUrl = textureUrl;
+
+        this.setupBuffers();
+        this.loadTexture();
+
+        this.vertexShader = compileShader(vertexShaderSource, gl.VERTEX_SHADER);
+        this.fragmentShader = compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER);
+        this.shaderProgram = gl.createProgram();
+        gl.attachShader(this.shaderProgram, this.vertexShader);
+        gl.attachShader(this.shaderProgram, this.fragmentShader);
+        gl.linkProgram(this.shaderProgram);
+        if (!gl.getProgramParameter(this.shaderProgram, gl.LINK_STATUS)) {
+            console.error('Unable to initialize the shader program: ' + gl.getProgramInfoLog(this.shaderProgram));
+        }
+        gl.useProgram(this.shaderProgram);
+
+        this.aPosition = gl.getAttribLocation(this.shaderProgram, 'aPosition');
+        this.aTexCoord = gl.getAttribLocation(this.shaderProgram, 'aTexCoord');
+        this.uModelViewMatrix = gl.getUniformLocation(this.shaderProgram, 'uModelViewMatrix');
+        this.uProjectionMatrix = gl.getUniformLocation(this.shaderProgram, 'uProjectionMatrix');
+        this.uSampler = gl.getUniformLocation(this.shaderProgram, 'uSampler');
+    }
+
+    setupBuffers() {
+        const { vertices, textureCoords } = createRingsVertices(1.2, 1.6, 100);
+    
+        this.positionBuffer = createBuffer(new Float32Array(vertices), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
+        this.textureCoordBuffer = createBuffer(new Float32Array(textureCoords), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
+        
+        this.vertexCount = vertices.length / 3;
+    }
+
+    loadTexture() {
+        this.texture = this.gl.createTexture();
+        const image = new Image();
+        image.onload = () => {
+            this.gl.bindTexture(this.gl.TEXTURE_2D, this.texture);
+            this.gl.texImage2D(this.gl.TEXTURE_2D, 0, this.gl.RGBA, this.gl.RGBA, this.gl.UNSIGNED_BYTE, image);
+            
+            // Texture is not power of 2. Turn of mips and set wrapping to clamp to edge
+            this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_S, this.gl.CLAMP_TO_EDGE);
+            this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_WRAP_T, this.gl.CLAMP_TO_EDGE);
+            this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MIN_FILTER, this.gl.LINEAR);
+            this.gl.texParameteri(this.gl.TEXTURE_2D, this.gl.TEXTURE_MAG_FILTER, this.gl.LINEAR);
+        };
+        image.src = this.textureUrl;
+    }
+
+    draw(projectionMatrix) {
+        gl.useProgram(this.shaderProgram);
+        var modelViewMatrix = GetModelView(-this.distance, 0, transZ, rotX, rotY);
+        // rotate the rings around saturn
+        var matrotX = [
+            1, 0, 0, 0,
+            0, Math.cos(30), -Math.sin(30), 0,
+            0, Math.sin(30), Math.cos(30), 0,
+            0, 0, 0, 1
+        ];
+    
+        var matrotY = [
+            Math.cos(45), 0, Math.sin(45), 0,
+            0, 1, 0, 0,
+            -Math.sin(45), 0, Math.cos(45), 0,
+            0, 0, 0, 1
+        ];
+        var rotation = MatrixMult(matrotY, matrotX);
+        modelViewMatrix = MatrixMult(modelViewMatrix, rotation);
+
+        this.gl.uniformMatrix4fv(this.uProjectionMatrix, false, projectionMatrix);
+        this.gl.uniformMatrix4fv(this.uModelViewMatrix, false, modelViewMatrix);
+
+        this.gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        this.gl.vertexAttribPointer(this.aPosition, 3, gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(this.aPosition);
+
+        this.gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordBuffer);
+        this.gl.vertexAttribPointer(this.aTexCoord, 2, gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(this.aTexCoord);
+
+        this.gl.activeTexture(gl.TEXTURE0);
+        this.gl.bindTexture(gl.TEXTURE_2D, this.texture);
+        this.gl.uniform1i(this.uSampler, 0);
+
+        this.gl.drawArrays(gl.TRIANGLE_STRIP, 0, this.vertexCount);
+    }
+}
+
 const orbitVertexShaderSource = `
 attribute vec4 aPosition;
 uniform mat4 uModelViewMatrix;
@@ -323,8 +438,11 @@ class OrbitDrawer{
     }
 }
 
+
+
 var planetDrawers;
 var orbitDrawers;
+var ringsDrawer;
 var canvas, gl;
 var perspectiveMatrix;	// perspective projection matrix
 var rotX=0, rotY=0, transZ=3, autorot=0;
@@ -351,6 +469,8 @@ function InitWebGL()
     orbitDrawers = orbitsData.map(orbitData =>
         new OrbitDrawer(gl, orbitData.radius, orbitData.vertices, orbitData.vertexCount)
     );
+
+    ringsDrawer = new SaturnRingsDrawer(gl, planetsData[6].distance, 'textures/saturn_rings.png');
 
 	// Set the viewport size
 	UpdateCanvasSize();
@@ -404,6 +524,7 @@ function drawScene() {
         orbitDrawer.draw(perspectiveMatrix);
     });
 
+    ringsDrawer.draw(perspectiveMatrix);
 }
 
 let dx, dy;
