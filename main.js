@@ -1,20 +1,68 @@
 const vertexShaderSource = `
 attribute vec4 aPosition;
+attribute vec3 aNormal;
 attribute vec2 aTexCoord;
+
 uniform mat4 uModelViewMatrix;
 uniform mat4 uProjectionMatrix;
+uniform vec3 uLightPosition;
+
 varying highp vec2 vTexCoord;
+varying highp vec3 vLightDirection;
+varying highp vec3 vNormal;
+
 void main(void) {
-    gl_Position = uProjectionMatrix * uModelViewMatrix * aPosition;
+    // Calculate world position
+    vec4 worldPosition = uModelViewMatrix * aPosition;
+    
+    // Pass varying variables to fragment shader
     vTexCoord = aTexCoord;
+    vNormal = mat3(uModelViewMatrix) * aNormal;
+    vLightDirection = uLightPosition - vec3(worldPosition);
+
+    // Transform vertex position into clip space
+    gl_Position = uProjectionMatrix * uModelViewMatrix * aPosition;
 }
 `;
 
+
 const fragmentShaderSource = `
+precision highp float;
 varying highp vec2 vTexCoord;
+varying highp vec3 vNormal;
+varying highp vec3 vLightDirection;
+
 uniform sampler2D uSampler;
+uniform vec3 uLightColor;
+uniform int isSun;
+
 void main(void) {
-    gl_FragColor = texture2D(uSampler, vTexCoord);
+    vec4 texelColor = texture2D(uSampler, vTexCoord);
+    if (isSun == 0){
+        // Normalize the input vectors
+        highp vec3 normal = normalize(vNormal);
+        highp vec3 lightDir = normalize(vLightDirection);
+
+        // Ambient light
+        highp vec3 ambientLight = vec3(0.2, 0.2, 0.2);
+
+        // Diffuse light
+        float diff = max(dot(normal, lightDir), 0.0);
+        highp vec3 diffuse = diff * uLightColor;
+
+        // Specular light
+        highp vec3 viewDir = normalize(-vLightDirection); // Assuming the view direction is along the light direction
+        highp vec3 reflectDir = reflect(-lightDir, normal);
+        float spec = pow(max(dot(viewDir, reflectDir), 0.0), 10000000.0);
+        highp vec3 specular = spec * uLightColor;
+
+        // Combine the results
+        highp vec3 lighting = ambientLight + diffuse + specular;
+        gl_FragColor = vec4(lighting * texelColor.rgb, texelColor.a);
+    }
+    if (isSun == 1) {
+        gl_FragColor = texelColor;
+    }
 }
 `;
 
@@ -165,6 +213,7 @@ function createOrbitVertices(radius, segments, thickness = 0.02, layers = 5) {
 function createRingsVertices(innerRadius, outerRadius, segments) {
     const vertices = [];
     const textureCoords = [];
+    const normals = [];
     for (let i = 0; i <= segments; i++) {
         const angle = (i / segments) * 2 * Math.PI;
         const cosAngle = Math.cos(angle);
@@ -177,8 +226,12 @@ function createRingsVertices(innerRadius, outerRadius, segments) {
         // Texture coordinates
         textureCoords.push(i / segments, 0); 
         textureCoords.push(i / segments, 1); 
+        
+        // Normals (pointing outward along Z axis)
+        normals.push(0, 0, -1);
+        normals.push(0, 0, -1);
     }
-    return { vertices, textureCoords };
+    return { vertices, textureCoords, normals };
 }
 
 function createBuffer(data, type, usage) {
@@ -206,12 +259,12 @@ const planetsData = [
 ];
 // Planet drawer class
 class PlanetDrawer {
-    constructor(gl, radius, distance, textureUrl) {
+    constructor(gl, radius, distance, textureUrl, isSun = 0) {
         this.gl = gl;
         this.radius = radius;
         this.distance = distance;
         this.textureUrl = textureUrl;
-
+        this.isSun = isSun;
         this.setupBuffers();
         this.loadTexture();
 
@@ -228,9 +281,15 @@ class PlanetDrawer {
 
         this.aPosition = gl.getAttribLocation(this.shaderProgram, 'aPosition');
         this.aTexCoord = gl.getAttribLocation(this.shaderProgram, 'aTexCoord');
+        this.aNormal = gl.getAttribLocation(this.shaderProgram, 'aNormal');
         this.uModelViewMatrix = gl.getUniformLocation(this.shaderProgram, 'uModelViewMatrix');
         this.uProjectionMatrix = gl.getUniformLocation(this.shaderProgram, 'uProjectionMatrix');
         this.uSampler = gl.getUniformLocation(this.shaderProgram, 'uSampler');
+        this.normalMatrix = gl.getUniformLocation(this.shaderProgram, 'uNormalMatrix');
+        this.uLightPosition = gl.getUniformLocation(this.shaderProgram, 'uLightPosition');
+        this.uLightColor = gl.getUniformLocation(this.shaderProgram, 'uLightColor');
+        this.isSunShader = gl.getUniformLocation(this.shaderProgram, 'isSun');
+        this.gl.uniform1i(this.isSunShader, this.isSun);
     }
 
     setupBuffers() {
@@ -257,6 +316,9 @@ class PlanetDrawer {
         gl.useProgram(this.shaderProgram);
         var modelViewMatrix = GetModelView(-this.distance, 0, transZ, rotX, rotY);
 
+        gl.uniform3f(this.uLightPosition, 0.0, 0.0, transZ);
+        gl.uniform3f(this.uLightColor, 1.0, 1.0, 1.0);
+
         //console.log("draw");
 
         this.gl.uniformMatrix4fv(this.uProjectionMatrix, false, projectionMatrix);
@@ -271,6 +333,10 @@ class PlanetDrawer {
         this.gl.enableVertexAttribArray(this.aTexCoord);
 
         this.gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.indexBuffer);
+
+        this.gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer);
+        this.gl.vertexAttribPointer(this.aNormal, 3, gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(this.aNormal);
 
         this.gl.activeTexture(gl.TEXTURE0);
         this.gl.bindTexture(gl.TEXTURE_2D, this.texture);
@@ -302,16 +368,20 @@ class SaturnRingsDrawer {
 
         this.aPosition = gl.getAttribLocation(this.shaderProgram, 'aPosition');
         this.aTexCoord = gl.getAttribLocation(this.shaderProgram, 'aTexCoord');
+        this.aNormal = gl.getAttribLocation(this.shaderProgram, 'aNormal');
         this.uModelViewMatrix = gl.getUniformLocation(this.shaderProgram, 'uModelViewMatrix');
         this.uProjectionMatrix = gl.getUniformLocation(this.shaderProgram, 'uProjectionMatrix');
         this.uSampler = gl.getUniformLocation(this.shaderProgram, 'uSampler');
+        this.uLightPosition = gl.getUniformLocation(this.shaderProgram, 'uLightPosition');
+        this.uLightColor = gl.getUniformLocation(this.shaderProgram, 'uLightColor');
     }
 
     setupBuffers() {
-        const { vertices, textureCoords } = createRingsVertices(1.2, 1.6, 100);
+        const { vertices, textureCoords, normals } = createRingsVertices(1.2, 1.6, 100);
     
         this.positionBuffer = createBuffer(new Float32Array(vertices), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
         this.textureCoordBuffer = createBuffer(new Float32Array(textureCoords), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
+        this.normalBuffer = createBuffer(new Float32Array(normals), gl.ARRAY_BUFFER, gl.STATIC_DRAW);
         
         this.vertexCount = vertices.length / 3;
     }
@@ -336,21 +406,26 @@ class SaturnRingsDrawer {
         gl.useProgram(this.shaderProgram);
         var modelViewMatrix = GetModelView(-this.distance, 0, transZ, rotX, rotY);
         // rotate the rings around saturn
+        var rx = degToRad(-50);
+        var ry = degToRad(90);
         var matrotX = [
             1, 0, 0, 0,
-            0, Math.cos(30), -Math.sin(30), 0,
-            0, Math.sin(30), Math.cos(30), 0,
+            0, Math.cos(rx), -Math.sin(rx), 0,
+            0, Math.sin(rx), Math.cos(rx), 0,
             0, 0, 0, 1
         ];
     
         var matrotY = [
-            Math.cos(45), 0, Math.sin(45), 0,
+            Math.cos(ry), 0, Math.sin(ry), 0,
             0, 1, 0, 0,
-            -Math.sin(45), 0, Math.cos(45), 0,
+            -Math.sin(ry), 0, Math.cos(ry), 0,
             0, 0, 0, 1
         ];
         var rotation = MatrixMult(matrotY, matrotX);
         modelViewMatrix = MatrixMult(modelViewMatrix, rotation);
+
+        this.gl.uniform3f(this.uLightPosition, 0.0, 0.0, transZ);
+        this.gl.uniform3f(this.uLightColor, 1.0, 1.0, 1.0);
 
         this.gl.uniformMatrix4fv(this.uProjectionMatrix, false, projectionMatrix);
         this.gl.uniformMatrix4fv(this.uModelViewMatrix, false, modelViewMatrix);
@@ -362,6 +437,10 @@ class SaturnRingsDrawer {
         this.gl.bindBuffer(gl.ARRAY_BUFFER, this.textureCoordBuffer);
         this.gl.vertexAttribPointer(this.aTexCoord, 2, gl.FLOAT, false, 0, 0);
         this.gl.enableVertexAttribArray(this.aTexCoord);
+
+        this.gl.bindBuffer(gl.ARRAY_BUFFER, this.normalBuffer);
+        this.gl.vertexAttribPointer(this.aNormal, 3, gl.FLOAT, false, 0, 0);
+        this.gl.enableVertexAttribArray(this.aNormal);
 
         this.gl.activeTexture(gl.TEXTURE0);
         this.gl.bindTexture(gl.TEXTURE_2D, this.texture);
@@ -462,9 +541,13 @@ function InitWebGL()
 	gl.enable(gl.DEPTH_TEST);
 	
 	// Initialize the programs and buffers for drawing
-	planetDrawers = planetsData.map(planetData =>
-        new PlanetDrawer(gl, planetData.radius, planetData.distance, planetData.textureUrl)
-    );
+    planetDrawers = planetsData.map((planetData, index) => {
+        if (index === 0) {
+            return new PlanetDrawer(gl, planetData.radius, planetData.distance, planetData.textureUrl, 1);
+        } else {
+            return new PlanetDrawer(gl, planetData.radius, planetData.distance, planetData.textureUrl);
+        }
+    });
 	// Initialize the program and buffers for drawing orbits
     orbitDrawers = orbitsData.map(orbitData =>
         new OrbitDrawer(gl, orbitData.radius, orbitData.vertices, orbitData.vertexCount)
