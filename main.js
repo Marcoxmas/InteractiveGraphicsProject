@@ -12,15 +12,12 @@ varying highp vec3 vLightDirection;
 varying highp vec3 vNormal;
 
 void main(void) {
-    // Calculate world position
     vec4 worldPosition = uModelViewMatrix * aPosition;
     
-    // Pass varying variables to fragment shader
     vTexCoord = aTexCoord;
     vNormal = mat3(uModelViewMatrix) * aNormal;
     vLightDirection = uLightPosition - vec3(worldPosition);
 
-    // Transform vertex position into clip space
     gl_Position = uProjectionMatrix * uModelViewMatrix * aPosition;
 }
 `;
@@ -39,7 +36,6 @@ uniform int isSun;
 void main(void) {
     vec4 texelColor = texture2D(uSampler, vTexCoord);
     if (isSun == 0){
-        // Normalize the input vectors
         highp vec3 normal = normalize(vNormal);
         highp vec3 lightDir = normalize(vLightDirection);
 
@@ -96,6 +92,16 @@ function MatrixMult( A, B )
 		}
 	}
 	return C;
+}
+
+function MatrixVectorMult(matrix, vector) {
+    var result = [0, 0, 0, 0];
+    for (var i = 0; i < 4; i++) {
+        for (var j = 0; j < 4; j++) {
+            result[i] += matrix[j * 4 + i] * vector[j];
+        }
+    }
+    return result;
 }
 
 function GetModelView(translationX, translationY, translationZ, rotationX, rotationY )
@@ -314,9 +320,14 @@ class PlanetDrawer {
 
     draw(projectionMatrix) {
         gl.useProgram(this.shaderProgram);
-        var modelViewMatrix = GetModelView(-this.distance, 0, transZ, rotX, rotY);
+        var modelViewMatrix = GetModelView(transX-this.distance, transY, transZ, rotX, rotY);
 
-        gl.uniform3f(this.uLightPosition, 0.0, 0.0, transZ);
+        var lightmv = GetModelView(transX, transY, transZ, rotX, rotY);
+        var lightPosition = [0.0, 0.0, 0.0, 1.0];
+        lightPosition = MatrixVectorMult(lightmv, lightPosition);
+        //console.log(lightmv, lightPosition);
+
+        gl.uniform3f(this.uLightPosition, lightPosition[0], lightPosition[1], lightPosition[2]);
         gl.uniform3f(this.uLightColor, 1.0, 1.0, 1.0);
 
         //console.log("draw");
@@ -404,7 +415,7 @@ class SaturnRingsDrawer {
 
     draw(projectionMatrix) {
         gl.useProgram(this.shaderProgram);
-        var modelViewMatrix = GetModelView(-this.distance, 0, transZ, rotX, rotY);
+        var modelViewMatrix = GetModelView(transX-this.distance, transY, transZ, rotX, rotY);
         // rotate the rings around saturn
         var rx = degToRad(-50);
         var ry = degToRad(90);
@@ -424,7 +435,12 @@ class SaturnRingsDrawer {
         var rotation = MatrixMult(matrotY, matrotX);
         modelViewMatrix = MatrixMult(modelViewMatrix, rotation);
 
-        this.gl.uniform3f(this.uLightPosition, 0.0, 0.0, transZ);
+        var lightmv = GetModelView(transX, transY, transZ, rotX, rotY);
+        var lightPosition = [0.0, 0.0, 0.0, 1.0];
+        lightPosition = MatrixVectorMult(lightmv, lightPosition);
+        //console.log(lightmv, lightPosition);
+        
+        gl.uniform3f(this.uLightPosition, lightPosition[0], lightPosition[1], lightPosition[2]);
         this.gl.uniform3f(this.uLightColor, 1.0, 1.0, 1.0);
 
         this.gl.uniformMatrix4fv(this.uProjectionMatrix, false, projectionMatrix);
@@ -504,8 +520,16 @@ class OrbitDrawer{
 
     draw(projectionMatrix) {
         gl.useProgram(this.shaderProgram);
-        var modelViewMatrix = GetModelView(0, 0, transZ, rotX + degToRad(90), rotY);
+        var modelViewMatrix = GetModelView(transX, transY, transZ, rotX, rotY);
 
+        var rx = degToRad(90);
+        var matrotX = [
+            1, 0, 0, 0,
+            0, Math.cos(rx), -Math.sin(rx), 0,
+            0, Math.sin(rx), Math.cos(rx), 0,
+            0, 0, 0, 1
+        ];
+        modelViewMatrix = MatrixMult(modelViewMatrix, matrotX);
         this.gl.uniformMatrix4fv(this.uProjectionMatrix, false, projectionMatrix);
         this.gl.uniformMatrix4fv(this.uModelViewMatrix, false, modelViewMatrix);
 
@@ -522,9 +546,11 @@ class OrbitDrawer{
 var planetDrawers;
 var orbitDrawers;
 var ringsDrawer;
+var lightPosition;
+var transformedLightPosition;
 var canvas, gl;
 var perspectiveMatrix;	// perspective projection matrix
-var rotX=0, rotY=0, transZ=3, autorot=0;
+var rotX=0, rotY=0, transZ=3, autorot=0, transX=0, transY=0;
 // Called once to initialize
 function InitWebGL()
 {
@@ -627,7 +653,17 @@ window.onload = function() {
 				canvas.zoom(5*(event.clientY - cy));
 				cy = event.clientY;
 			}
-		} else {
+		} else if (event.shiftKey) {
+            canvas.onmousemove = function() {
+                const transMultiplier = 5.0;
+                transX += transMultiplier * (event.clientX - cx) / canvas.width;
+                transY -= transMultiplier * (event.clientY - cy) / canvas.height;
+                cx = event.clientX;
+                cy = event.clientY;
+                UpdateProjectionMatrix();
+                drawScene();
+            }
+        } else {
 			canvas.onmousemove = function() {
 				rotY += (cx - event.clientX)/canvas.width*5;
 				rotX += (cy - event.clientY)/canvas.height*5;
@@ -636,7 +672,7 @@ window.onload = function() {
 				UpdateProjectionMatrix();
 				drawScene();
 			}
-		}
+        }
 	}
 	canvas.onmouseup = canvas.onmouseleave = function() {
 		canvas.onmousemove = null;
