@@ -550,7 +550,7 @@ var lightPosition;
 var transformedLightPosition;
 var canvas, gl;
 var perspectiveMatrix;	// perspective projection matrix
-var rotX=0, rotY=0, transZ=3, autorot=0, transX=0, transY=0;
+var rotX=0, rotY=0, transZ=10, autorot=0, transX=0, transY=0;
 // Called once to initialize
 function InitWebGL()
 {
@@ -677,6 +677,16 @@ window.onload = function() {
 	canvas.onmouseup = canvas.onmouseleave = function() {
 		canvas.onmousemove = null;
 	}
+
+    document.getElementById('reset-button').addEventListener('click', function() {
+        transX = 0;
+        transY = 0;
+        transZ = 10;
+        rotX = 0;
+        rotY = 0;
+        UpdateProjectionMatrix();
+        drawScene();
+    });
 	
 	drawScene();
 };
