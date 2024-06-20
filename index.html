@@ -39,7 +39,7 @@
             align-items: center;
             height: 100%;
         }
-        #reset-button {
+        .button {
             margin-top: 20px;
             padding: 10px;
             background-color: #444;
@@ -48,7 +48,7 @@
             cursor: pointer;
             font-size: 16px;
         }
-        #reset-button:hover {
+        .button:hover {
             background-color: #555;
         }
     </style>
@@ -58,7 +58,8 @@
         <canvas id="canvas"></canvas>
     </div>
     <div id="sidebar">
-        <button id="reset-button">Reset</button>
+        <button class="button" id="reset-button">Reset</button>
+        <button class="button" id="play/pause">Play/Pause</button>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"></script>
     <script src="main.js"></script>

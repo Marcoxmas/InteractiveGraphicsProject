@@ -253,23 +253,24 @@ function degToRad(degrees) {
 
 // Planet data: name, radius, distance from the sun
 const planetsData = [
-    { name: "Sun", radius: 1, distance: 0, textureUrl: 'textures/sun.jpg'},
-    { name: "Mercury", radius: 0.1, distance: 1.38, textureUrl: 'textures/mercury.jpg'},
-    { name: "Venus", radius: 0.3, distance: 2, textureUrl: 'textures/venus.jpg'},
-    { name: "Earth", radius: 0.4, distance: 3, textureUrl: 'textures/earth.jpg'},
-    { name: "Mars", radius: 0.4, distance: 4.4, textureUrl: 'textures/mars.jpg'},
-    { name: "Jupiter", radius: 0.7, distance: 8.2, textureUrl: 'textures/jupiter.jpg'},
-    { name: "Saturn", radius: 0.6, distance: 12.58, textureUrl: 'textures/saturn.jpg'},
-    { name: "Uranus", radius: 0.5, distance: 20.14, textureUrl: 'textures/uranus.jpg'},
-    { name: "Neptune", radius: 0.5, distance: 31.20, textureUrl: 'textures/neptune.jpg'}
+    { name: "Sun", radius: 1, distance: 0, textureUrl: 'textures/sun.jpg', starting_angle: 0},
+    { name: "Mercury", radius: 0.1, distance: 1.38, textureUrl: 'textures/mercury.jpg', starting_angle: 135},
+    { name: "Venus", radius: 0.3, distance: 2, textureUrl: 'textures/venus.jpg', starting_angle: 35},
+    { name: "Earth", radius: 0.4, distance: 3, textureUrl: 'textures/earth.jpg', starting_angle: 180},
+    { name: "Mars", radius: 0.4, distance: 4.4, textureUrl: 'textures/mars.jpg', starting_angle: 285},
+    { name: "Jupiter", radius: 0.7, distance: 8.2, textureUrl: 'textures/jupiter.jpg', starting_angle: 100},
+    { name: "Saturn", radius: 0.6, distance: 12.58, textureUrl: 'textures/saturn.jpg', starting_angle: 130},
+    { name: "Uranus", radius: 0.5, distance: 20.14, textureUrl: 'textures/uranus.jpg', starting_angle: 60},
+    { name: "Neptune", radius: 0.5, distance: 31.20, textureUrl: 'textures/neptune.jpg', starting_angle: 85}
 ];
 // Planet drawer class
 class PlanetDrawer {
-    constructor(gl, radius, distance, textureUrl, isSun = 0) {
+    constructor(gl, radius, distance, textureUrl, starting_angle, isSun = 0) {
         this.gl = gl;
         this.radius = radius;
         this.distance = distance;
         this.textureUrl = textureUrl;
+        this.starting_angle = starting_angle;
         this.isSun = isSun;
         this.setupBuffers();
         this.loadTexture();
@@ -320,7 +321,20 @@ class PlanetDrawer {
 
     draw(projectionMatrix) {
         gl.useProgram(this.shaderProgram);
-        var modelViewMatrix = GetModelView(transX-this.distance, transY, transZ, rotX, rotY);
+        // Polar coordinates
+        var theta = degToRad(this.starting_angle);
+        var transXadd = this.distance * Math.cos(theta);
+        var transZadd = this.distance * Math.sin(theta);
+        //console.log(transXadd, transZadd, this.distance);
+        var modelViewMatrix = GetModelView(transX + transXadd, transY, transZ, rotX, rotY);
+        // need to transalate Z axis more
+        var transZaddmat = [
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, transZadd, 1
+        ];
+        modelViewMatrix = MatrixMult(modelViewMatrix, transZaddmat);
 
         var lightmv = GetModelView(transX, transY, transZ, rotX, rotY);
         var lightPosition = [0.0, 0.0, 0.0, 1.0];
@@ -358,9 +372,10 @@ class PlanetDrawer {
 }
 
 class SaturnRingsDrawer {
-    constructor(gl, distance, textureUrl) {
-        this.gl = gl;;
+    constructor(gl, distance, starting_angle,textureUrl) {
+        this.gl = gl;
         this.distance = distance;
+        this.starting_angle = starting_angle;
         this.textureUrl = textureUrl;
 
         this.setupBuffers();
@@ -415,7 +430,20 @@ class SaturnRingsDrawer {
 
     draw(projectionMatrix) {
         gl.useProgram(this.shaderProgram);
-        var modelViewMatrix = GetModelView(transX-this.distance, transY, transZ, rotX, rotY);
+        // Polar coordinates
+        var theta = degToRad(this.starting_angle);
+        var transXadd = this.distance * Math.cos(theta);
+        var transZadd = this.distance * Math.sin(theta);
+        //console.log(transXadd, transZadd, this.distance);
+        var modelViewMatrix = GetModelView(transX + transXadd, transY, transZ, rotX, rotY);
+        // need to transalate Z axis more
+        var transZaddmat = [
+            1, 0, 0, 0,
+            0, 1, 0, 0,
+            0, 0, 1, 0,
+            0, 0, transZadd, 1
+        ];
+        modelViewMatrix = MatrixMult(modelViewMatrix, transZaddmat);
         // rotate the rings around saturn
         var rx = degToRad(-50);
         var ry = degToRad(90);
@@ -569,9 +597,9 @@ function InitWebGL()
 	// Initialize the programs and buffers for drawing
     planetDrawers = planetsData.map((planetData, index) => {
         if (index === 0) {
-            return new PlanetDrawer(gl, planetData.radius, planetData.distance, planetData.textureUrl, 1);
+            return new PlanetDrawer(gl, planetData.radius, planetData.distance, planetData.textureUrl, planetData.starting_angle, 1);
         } else {
-            return new PlanetDrawer(gl, planetData.radius, planetData.distance, planetData.textureUrl);
+            return new PlanetDrawer(gl, planetData.radius, planetData.distance, planetData.textureUrl, planetData.starting_angle);
         }
     });
 	// Initialize the program and buffers for drawing orbits
@@ -579,7 +607,7 @@ function InitWebGL()
         new OrbitDrawer(gl, orbitData.radius, orbitData.vertices, orbitData.vertexCount)
     );
 
-    ringsDrawer = new SaturnRingsDrawer(gl, planetsData[6].distance, 'textures/saturn_rings.png');
+    ringsDrawer = new SaturnRingsDrawer(gl, planetsData[6].distance, planetsData[6].starting_angle,'textures/saturn_rings.png');
 
 	// Set the viewport size
 	UpdateCanvasSize();
