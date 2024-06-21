@@ -253,25 +253,26 @@ function degToRad(degrees) {
 
 // Planet data: name, radius, distance from the sun
 const planetsData = [
-    { name: "Sun", radius: 1, distance: 0, textureUrl: 'textures/sun.jpg', starting_angle: 0, revolution_mult: 0},
-    { name: "Mercury", radius: 0.1, distance: 1.38, textureUrl: 'textures/mercury.jpg', starting_angle: 135, revolution_mult: 0.24},
-    { name: "Venus", radius: 0.3, distance: 2, textureUrl: 'textures/venus.jpg', starting_angle: 35, revolution_mult: 0.61},
-    { name: "Earth", radius: 0.4, distance: 3, textureUrl: 'textures/earth.jpg', starting_angle: 180, revolution_mult: 1},
-    { name: "Mars", radius: 0.4, distance: 4.4, textureUrl: 'textures/mars.jpg', starting_angle: 285,revolution_mult: 1.88},
-    { name: "Jupiter", radius: 0.7, distance: 8.2, textureUrl: 'textures/jupiter.jpg', starting_angle: 100,revolution_mult: 11.86},
-    { name: "Saturn", radius: 0.6, distance: 12.58, textureUrl: 'textures/saturn.jpg', starting_angle: 130,revolution_mult: 29.46},
-    { name: "Uranus", radius: 0.5, distance: 20.14, textureUrl: 'textures/uranus.jpg', starting_angle: 60,revolution_mult: 84.01},
-    { name: "Neptune", radius: 0.5, distance: 31.20, textureUrl: 'textures/neptune.jpg', starting_angle: 85,revolution_mult: 164.79},
+    { name: "Sun", radius: 1, distance: 0, textureUrl: 'textures/sun.jpg', starting_angle: 0, revolution_mult: 0, rotation_mult: 27},
+    { name: "Mercury", radius: 0.1, distance: 1.38, textureUrl: 'textures/mercury.jpg', starting_angle: 135, revolution_mult: 0.24, rotation_mult: 58.6},
+    { name: "Venus", radius: 0.3, distance: 2, textureUrl: 'textures/venus.jpg', starting_angle: 35, revolution_mult: 0.61, rotation_mult: 243},
+    { name: "Earth", radius: 0.4, distance: 3, textureUrl: 'textures/earth.jpg', starting_angle: 180, revolution_mult: 1, rotation_mult: 1},
+    { name: "Mars", radius: 0.4, distance: 4.4, textureUrl: 'textures/mars.jpg', starting_angle: 285,revolution_mult: 1.88, rotation_mult: 1.03},
+    { name: "Jupiter", radius: 0.7, distance: 8.2, textureUrl: 'textures/jupiter.jpg', starting_angle: 100,revolution_mult: 11.86, rotation_mult: 0.41},
+    { name: "Saturn", radius: 0.6, distance: 12.58, textureUrl: 'textures/saturn.jpg', starting_angle: 130,revolution_mult: 29.46, rotation_mult: 0.45},
+    { name: "Uranus", radius: 0.5, distance: 20.14, textureUrl: 'textures/uranus.jpg', starting_angle: 60,revolution_mult: 84.01, rotation_mult: 0.72},
+    { name: "Neptune", radius: 0.5, distance: 31.20, textureUrl: 'textures/neptune.jpg', starting_angle: 85,revolution_mult: 164.79, rotation_mult: 0.67},
 ];
 // Planet drawer class
 class PlanetDrawer {
-    constructor(gl, radius, distance, textureUrl, starting_angle, revolution_mult, isSun = 0) {
+    constructor(gl, radius, distance, textureUrl, starting_angle, revolution_mult, rotation_mult, isSun = 0) {
         this.gl = gl;
         this.radius = radius;
         this.distance = distance;
         this.textureUrl = textureUrl;
         this.starting_angle = starting_angle;
         this.revolution_mult = revolution_mult;
+        this.rotation_mult = rotation_mult;
         this.isSun = isSun;
         this.setupBuffers();
         this.loadTexture();
@@ -327,6 +328,7 @@ class PlanetDrawer {
             var theta = degToRad(this.starting_angle) + autorev/this.revolution_mult;
         else
             var theta = degToRad(this.starting_angle);
+        var alpha = autorot / this.rotation_mult;
         var transXadd = this.distance * Math.cos(theta);
         var transZadd = this.distance * Math.sin(theta);
         //console.log(transXadd, transZadd, this.distance);
@@ -338,7 +340,14 @@ class PlanetDrawer {
             0, 0, 1, 0,
             0, 0, transZadd, 1
         ];
-        modelViewMatrix = MatrixMult(modelViewMatrix, transZaddmat);
+        var rotmatY = [
+            Math.cos(alpha), 0, Math.sin(alpha), 0,
+            0, 1, 0, 0,
+            -Math.sin(alpha), 0, Math.cos(alpha), 0,
+            0, 0, 0, 1
+        ];
+        var transform = MatrixMult(transZaddmat, rotmatY); // first self rotation
+        modelViewMatrix = MatrixMult(modelViewMatrix, transform);
 
         var lightmv = GetModelView(transX, transY, transZ, rotX, rotY);
         var lightPosition = [0.0, 0.0, 0.0, 1.0];
@@ -583,7 +592,7 @@ var lightPosition;
 var transformedLightPosition;
 var canvas, gl;
 var perspectiveMatrix;	// perspective projection matrix
-var rotX=0, rotY=0, transZ=10, autorev=0, transX=0, transY=0, autorev=0;
+var rotX=0, rotY=0, transZ=10, autorot=0, transX=0, transY=0, autorev=0;
 // Called once to initialize
 function InitWebGL()
 {
@@ -602,9 +611,9 @@ function InitWebGL()
 	// Initialize the programs and buffers for drawing
     planetDrawers = planetsData.map((planetData, index) => {
         if (index === 0) {
-            return new PlanetDrawer(gl, planetData.radius, planetData.distance, planetData.textureUrl, planetData.starting_angle, planetData.revolution_mult, 1);
+            return new PlanetDrawer(gl, planetData.radius, planetData.distance, planetData.textureUrl, planetData.starting_angle, planetData.revolution_mult, planetData.rotation_mult, 1);
         } else {
-            return new PlanetDrawer(gl, planetData.radius, planetData.distance, planetData.textureUrl, planetData.starting_angle, planetData.revolution_mult);
+            return new PlanetDrawer(gl, planetData.radius, planetData.distance, planetData.textureUrl, planetData.starting_angle, planetData.revolution_mult, planetData.rotation_mult);
         }
     });
 	// Initialize the program and buffers for drawing orbits
@@ -717,6 +726,8 @@ window.onload = function() {
         transZ = 10;
         rotX = 0;
         rotY = 0;
+        autorot = 0;
+        autorev = 0;
         UpdateProjectionMatrix();
         drawScene();
     });
@@ -745,8 +756,11 @@ function AutoRotate( param )
                 var v = document.getElementById('rotation-speed').value;
                 const counter = document.getElementById('counter');
                 counter.textContent = `${v} days/sec`;
-                autorev += 0.000175 * v;
+                autorev += 0.000175 * v; // 1 degree in radiants = 1 day approx
                 if ( autorev > 164.79*2*Math.PI ) autorev -= 164.79*2*Math.PI;
+
+                autorot += ((2*Math.PI)/100) * v; // 360 degree in radiants = 1 day 
+                if (autorot > 243 * 2 * Math.PI) autorot -= 243 * 2 * Math.PI; 
                 drawScene();
             }, 10
         );
