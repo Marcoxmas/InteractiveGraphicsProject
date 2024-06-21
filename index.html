@@ -7,6 +7,7 @@
     <style>
         html, body {
             height: 100%;
+            width: 100%;
             margin: 0;
             padding: 0;
             overflow: hidden;
@@ -40,7 +41,6 @@
             height: 100%;
         }
         .button {
-            margin-top: 20px;
             padding: 10px;
             background-color: #444;
             border: none;
@@ -51,6 +51,20 @@
         .button:hover {
             background-color: #555;
         }
+        .button:disabled {
+            background-color: lightgray;
+        }
+        .hide {
+            display: none;
+        }
+        .center {
+            display: inherit;
+            flex-direction: inherit;
+            align-items: inherit;
+        }
+        .control {
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body onresize="WindowResize();">
@@ -59,7 +73,15 @@
     </div>
     <div id="sidebar">
         <button class="button" id="reset-button">Reset</button>
-        <button class="button" id="play/pause">Play/Pause</button>
+        <div class="control">
+            <button class="button" id="play">Play</button>
+            <button class="button" id="pause" disabled>Pause</button>
+        </div>
+        <div class="control center">
+            <label for="rotation-speed">Change Speed:</label>
+            <input id="rotation-speed" type="range" min="1" max="100" value="50" disabled/>
+        </div>
+        <div class ="hide", id="counter"><p>50 days/sec</p></div>
     </div>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/gl-matrix/2.8.1/gl-matrix-min.js"></script>
     <script src="main.js"></script>
