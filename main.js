@@ -253,19 +253,145 @@ function degToRad(degrees) {
 
 // Planet data: name, radius, distance from the sun
 const planetsData = [
-    { name: "Sun", radius: 1, distance: 0, textureUrl: 'textures/sun.jpg', starting_angle: 0, revolution_mult: 0, rotation_mult: 27},
-    { name: "Mercury", radius: 0.1, distance: 1.38, textureUrl: 'textures/mercury.jpg', starting_angle: 135, revolution_mult: 0.24, rotation_mult: 58.6},
-    { name: "Venus", radius: 0.3, distance: 2, textureUrl: 'textures/venus.jpg', starting_angle: 35, revolution_mult: 0.61, rotation_mult: 243},
-    { name: "Earth", radius: 0.4, distance: 3, textureUrl: 'textures/earth.jpg', starting_angle: 180, revolution_mult: 1, rotation_mult: 1},
-    { name: "Mars", radius: 0.4, distance: 4.4, textureUrl: 'textures/mars.jpg', starting_angle: 285,revolution_mult: 1.88, rotation_mult: 1.03},
-    { name: "Jupiter", radius: 0.7, distance: 8.2, textureUrl: 'textures/jupiter.jpg', starting_angle: 100,revolution_mult: 11.86, rotation_mult: 0.41},
-    { name: "Saturn", radius: 0.6, distance: 12.58, textureUrl: 'textures/saturn.jpg', starting_angle: 130,revolution_mult: 29.46, rotation_mult: 0.45},
-    { name: "Uranus", radius: 0.5, distance: 20.14, textureUrl: 'textures/uranus.jpg', starting_angle: 60,revolution_mult: 84.01, rotation_mult: 0.72},
-    { name: "Neptune", radius: 0.5, distance: 31.20, textureUrl: 'textures/neptune.jpg', starting_angle: 85,revolution_mult: 164.79, rotation_mult: 0.67},
+    { 
+        name: "Sun", 
+        radius: 1, 
+        distance: 0, 
+        textureUrl: 'textures/sun.jpg', 
+        starting_angle: 0, 
+        revolution_mult: 0, 
+        rotation_mult: 27,
+        info: {
+            "Distance from Earth": "149.6 million km",
+            "Radius": "696,340 km",
+            "Mass": "1.989 x 10^30 kg",
+            "Surface temperature": "5,500 °C",
+        }
+    },
+    { 
+        name: "Mercury", 
+        radius: 0.1, 
+        distance: 1.38, 
+        textureUrl: 'textures/mercury.jpg', 
+        starting_angle: 135, 
+        revolution_mult: 0.24, 
+        rotation_mult: 58.6,
+        info: {
+            "Distance from Earth": "77.3 million km",
+            "Radius": "2,439.7 km",
+            "Mass": "3.285 x 10^23 kg",
+            "Surface temperature": "430 °C",
+        }
+    },
+    { 
+        name: "Venus", 
+        radius: 0.3, 
+        distance: 2, 
+        textureUrl: 'textures/venus.jpg', 
+        starting_angle: 35, 
+        revolution_mult: 0.61, 
+        rotation_mult: 243,
+        info: {
+            "Distance from Earth": "38.2 million km",
+            "Radius": "6,051.8 km",
+            "Mass": "4.867 x 10^24 kg",
+            "Surface temperature": "471 °C",
+        }
+    },
+    { 
+        name: "Earth", 
+        radius: 0.4, 
+        distance: 3, 
+        textureUrl: 'textures/earth.jpg', 
+        starting_angle: 180, 
+        revolution_mult: 1, 
+        rotation_mult: 1,
+        info: {
+            "Distance from Earth": "0 km",
+            "Radius": "6,371 km",
+            "Mass": "5.972 x 10^24 kg",
+            "Surface temperature": "15 °C",
+        }
+    },
+    { 
+        name: "Mars", 
+        radius: 0.4, 
+        distance: 4.4, 
+        textureUrl: 'textures/mars.jpg', 
+        starting_angle: 285, 
+        revolution_mult: 1.88, 
+        rotation_mult: 1.03,
+        info: {
+            "Distance from Earth": "54.6 million km",
+            "Radius": "3,389.5 km",
+            "Mass": "6.417 x 10^23 kg",
+            "Surface temperature": "-28 °C",
+        }
+    },
+    { 
+        name: "Jupiter", 
+        radius: 0.7, 
+        distance: 8.2, 
+        textureUrl: 'textures/jupiter.jpg', 
+        starting_angle: 100, 
+        revolution_mult: 11.86, 
+        rotation_mult: 0.41,
+        info: {
+            "Distance from Earth": "588.5 million km",
+            "Radius": "69,911 km",
+            "Mass": "1.898 x 10^27 kg",
+            "Surface temperature": "-108 °C",
+        }
+    },
+    { 
+        name: "Saturn", 
+        radius: 0.6, 
+        distance: 12.58, 
+        textureUrl: 'textures/saturn.jpg', 
+        starting_angle: 130, 
+        revolution_mult: 29.46, 
+        rotation_mult: 0.45,
+        info: {
+            "Distance from Earth": "1.2 billion km",
+            "Radius": "58,232 km",
+            "Mass": "5.683 x 10^26 kg",
+            "Surface temperature": "-139 °C",
+        }
+    },
+    { 
+        name: "Uranus", 
+        radius: 0.5, 
+        distance: 20.14, 
+        textureUrl: 'textures/uranus.jpg', 
+        starting_angle: 60, 
+        revolution_mult: 84.01, 
+        rotation_mult: 0.72,
+        info: {
+            "Distance from Earth": "2.6 billion km",
+            "Radius": "25,362 km",
+            "Mass": "8.681 x 10^25 kg",
+            "Surface temperature": "-197 °C",
+        }
+    },
+    { 
+        name: "Neptune", 
+        radius: 0.5, 
+        distance: 31.20, 
+        textureUrl: 'textures/neptune.jpg', 
+        starting_angle: 85, 
+        revolution_mult: 164.79, 
+        rotation_mult: 0.67,
+        info: {
+            "Distance from Earth": "4.3 billion km",
+            "Radius": "24,622 km",
+            "Mass": "1.024 x 10^26 kg",
+            "Surface temperature": "-201 °C",
+        }
+    },
 ];
 // Planet drawer class
 class PlanetDrawer {
-    constructor(gl, name, radius, distance, textureUrl, starting_angle, revolution_mult, rotation_mult, isSun = 0) {
+    constructor(gl, name, radius, distance, textureUrl, starting_angle, revolution_mult, rotation_mult, isSun = 0, info) {
         this.gl = gl;
         this.name = name;
         this.radius = radius;
@@ -275,6 +401,7 @@ class PlanetDrawer {
         this.revolution_mult = revolution_mult;
         this.rotation_mult = rotation_mult;
         this.isSun = isSun;
+        this.info = info;
         this.setupBuffers();
         this.loadTexture();
 
@@ -626,9 +753,9 @@ function InitWebGL()
 	// Initialize the programs and buffers for drawing
     planetDrawers = planetsData.map((planetData, index) => {
         if (index === 0) {
-            return new PlanetDrawer(gl, planetData.name, planetData.radius, planetData.distance, planetData.textureUrl, planetData.starting_angle, planetData.revolution_mult, planetData.rotation_mult, 1);
+            return new PlanetDrawer(gl, planetData.name, planetData.radius, planetData.distance, planetData.textureUrl, planetData.starting_angle, planetData.revolution_mult, planetData.rotation_mult, 1, planetData.info);
         } else {
-            return new PlanetDrawer(gl, planetData.name, planetData.radius, planetData.distance, planetData.textureUrl, planetData.starting_angle, planetData.revolution_mult, planetData.rotation_mult);
+            return new PlanetDrawer(gl, planetData.name, planetData.radius, planetData.distance, planetData.textureUrl, planetData.starting_angle, planetData.revolution_mult, planetData.rotation_mult, 0,planetData.info);
         }
     });
 	// Initialize the program and buffers for drawing orbits
@@ -831,6 +958,56 @@ function checkIntersections(ndcX, ndcY, cameraPosition) {
         if (planetDrawer.intersectSphere(ray)) {
             console.log(`Clicked on ${planetDrawer.name}`);
             // Handle click on planet
+            const info = planetDrawer.info;
+            const name = planetDrawer.name;
+            const rotation = planetDrawer.rotation_mult;
+            const revolution = planetDrawer.revolution_mult;
+            const yearLength = (revolution * 365).toFixed(2);
+            const infoDiv = document.getElementById('info');
+            infoDiv.innerHTML = '';
+            const title = document.createElement('h2');
+            title.textContent = name;
+            infoDiv.appendChild(title);
+            const table = document.createElement('table');
+            for (let key in info) {
+                const row = document.createElement('tr');
+                const titleCell = document.createElement('td');
+                const infoCell = document.createElement('td');
+                titleCell.textContent = key;
+                infoCell.textContent = info[key];
+                row.appendChild(titleCell);
+                row.appendChild(infoCell);
+                table.appendChild(row);
+            }
+            infoDiv.appendChild(table);
+
+            const rottitle= document.createElement('h3');
+            rottitle.textContent = 'Day length:';
+            infoDiv.appendChild(rottitle);
+
+            const rotationInfo = document.createElement('p');
+            const rotationDays = Math.floor(rotation);
+            const rotationHours = Math.floor((rotation - rotationDays) * 24);
+            const rotationMinutes = Math.floor(((rotation - rotationDays) * 24 - rotationHours) * 60);
+            const rotationSeconds = Math.floor((((rotation - rotationDays) * 24 - rotationHours) * 60 - rotationMinutes) * 60);
+            rotationInfo.textContent = `${rotationDays}d ${rotationHours}h ${rotationMinutes}m ${rotationSeconds}s`;
+
+            infoDiv.appendChild(rotationInfo);
+
+            const revtitle = document.createElement('h3');
+            revtitle.textContent = 'Year length:';
+            infoDiv.appendChild(revtitle);
+
+            const revolutionInfo = document.createElement('p');
+            var revolutionDays = Math.floor(yearLength);
+            const revolutionHours = Math.floor((yearLength - revolutionDays) * 24);
+            const revolutionMinutes = Math.floor(((yearLength - revolutionDays) * 24 - revolutionHours) * 60);
+            const revolutionSeconds = Math.floor((((yearLength - revolutionDays) * 24 - revolutionHours) * 60 - revolutionMinutes) * 60);
+            const revolutionYears = Math.floor(revolutionDays / 365);
+            revolutionDays %= 365;
+            revolutionInfo.textContent = `${revolutionYears}y ${revolutionDays}d ${revolutionHours}h ${revolutionMinutes}m ${revolutionSeconds}s`;
+
+            infoDiv.appendChild(revolutionInfo);
         }
     }
 }
