@@ -265,8 +265,9 @@ const planetsData = [
 ];
 // Planet drawer class
 class PlanetDrawer {
-    constructor(gl, radius, distance, textureUrl, starting_angle, revolution_mult, rotation_mult, isSun = 0) {
+    constructor(gl, name, radius, distance, textureUrl, starting_angle, revolution_mult, rotation_mult, isSun = 0) {
         this.gl = gl;
+        this.name = name;
         this.radius = radius;
         this.distance = distance;
         this.textureUrl = textureUrl;
@@ -349,6 +350,8 @@ class PlanetDrawer {
         var transform = MatrixMult(transZaddmat, rotmatY); // first self rotation
         modelViewMatrix = MatrixMult(modelViewMatrix, transform);
 
+        this.center = MatrixVectorMult(modelViewMatrix, [0, 0, 0, 1]);
+
         var lightmv = GetModelView(transX, transY, transZ, rotX, rotY);
         var lightPosition = [0.0, 0.0, 0.0, 1.0];
         lightPosition = MatrixVectorMult(lightmv, lightPosition);
@@ -381,6 +384,18 @@ class PlanetDrawer {
         this.gl.uniform1i(this.uSampler, 0);
 
         this.gl.drawElements(gl.TRIANGLES, this.vertexCount, gl.UNSIGNED_SHORT, 0);
+    }
+
+    intersectSphere(ray) {
+        const oc = vec3.create();
+        vec3.sub(oc, ray.origin, this.center);
+
+        const a = vec3.dot(ray.direction, ray.direction);
+        const b = 2.0 * vec3.dot(oc, ray.direction);
+        const c = vec3.dot(oc, oc) - this.radius * this.radius;
+        const discriminant = b * b - 4 * a * c;
+
+        return (discriminant > 0);
     }
 }
 
@@ -611,9 +626,9 @@ function InitWebGL()
 	// Initialize the programs and buffers for drawing
     planetDrawers = planetsData.map((planetData, index) => {
         if (index === 0) {
-            return new PlanetDrawer(gl, planetData.radius, planetData.distance, planetData.textureUrl, planetData.starting_angle, planetData.revolution_mult, planetData.rotation_mult, 1);
+            return new PlanetDrawer(gl, planetData.name, planetData.radius, planetData.distance, planetData.textureUrl, planetData.starting_angle, planetData.revolution_mult, planetData.rotation_mult, 1);
         } else {
-            return new PlanetDrawer(gl, planetData.radius, planetData.distance, planetData.textureUrl, planetData.starting_angle, planetData.revolution_mult, planetData.rotation_mult);
+            return new PlanetDrawer(gl, planetData.name, planetData.radius, planetData.distance, planetData.textureUrl, planetData.starting_angle, planetData.revolution_mult, planetData.rotation_mult);
         }
     });
 	// Initialize the program and buffers for drawing orbits
@@ -720,6 +735,8 @@ window.onload = function() {
 		canvas.onmousemove = null;
 	}
 
+    canvas.addEventListener('click', onMouseClick, false);
+
     document.getElementById('reset-button').addEventListener('click', function() {
         transX = 0;
         transY = 0;
@@ -775,5 +792,61 @@ function AutoRotate( param )
         document.getElementById('play').disabled = false;
         document.getElementById('counter').classList.add('hide');
     }
+}
+
+function getRay(ndcX, ndcY, cameraPosition) {
+    const inverseProjectionMatrix = mat4.create();
+    mat4.invert(inverseProjectionMatrix, perspectiveMatrix);
+
+    const nearPoint = vec4.fromValues(ndcX, ndcY, -1.0, 1.0);
+    const farPoint = vec4.fromValues(ndcX, ndcY, 1.0, 1.0);
+
+    vec4.transformMat4(nearPoint, nearPoint, inverseProjectionMatrix);
+    vec4.transformMat4(farPoint, farPoint, inverseProjectionMatrix);
+
+    nearPoint[0] /= nearPoint[3];
+    nearPoint[1] /= nearPoint[3];
+    nearPoint[2] /= nearPoint[3];
+
+    farPoint[0] /= farPoint[3];
+    farPoint[1] /= farPoint[3];
+    farPoint[2] /= farPoint[3];
+
+    const rayDirection = vec3.create();
+    vec3.sub(rayDirection, vec3.fromValues(farPoint[0], farPoint[1], farPoint[2]), vec3.fromValues(nearPoint[0], nearPoint[1], nearPoint[2]));
+    vec3.normalize(rayDirection, rayDirection);
+
+    return {
+        origin: cameraPosition,
+        direction: rayDirection
+    };
+}
+
+
+
+function checkIntersections(ndcX, ndcY, cameraPosition) {
+    const ray = getRay(ndcX, ndcY, cameraPosition);
+
+    for (let planetDrawer of planetDrawers) {
+        if (planetDrawer.intersectSphere(ray)) {
+            console.log(`Clicked on ${planetDrawer.name}`);
+            // Handle click on planet
+        }
+    }
+}
+
+
+function onMouseClick(event) {
+    const mouseX = event.clientX;
+    const mouseY = event.clientY;
+    const rect = canvas.getBoundingClientRect();
+
+    // Convert mouse position to normalized device coordinates
+    const ndcX = ((mouseX - rect.left) / rect.width) * 2 - 1;
+    const ndcY = -((mouseY - rect.top) / rect.height) * 2 + 1;
+
+    const cameraPosition = vec3.fromValues(0, 0, 0);
+
+    checkIntersections(ndcX, ndcY, cameraPosition);
 }
 
